@@ -24,10 +24,10 @@ $(eval $(call DEFAULT_VAR,CXX,clang++))
 CFLAGS ?= -O2 -g -Wall -Wextra -Wpedantic
 NASMFLAGS ?= -F dwarf -g
 LDFLAGS ?=
-CPPFLAGS ?= -O2 -g -Wall -Wextra -Wpedantic
+CXXFLAGS ?=
 
-# Internal common flags
-override INTERNALFLAGS := 	\
+# Internal C flags
+override INTERNALCFLAGS := 	\
 	-I.					 	\
 	-ffreestanding			\
 	-fno-builtin			\
@@ -46,19 +46,7 @@ override INTERNALFLAGS := 	\
 	-mno-red-zone			\
 	-mcmodel=kernel			\
 	-MMD
-
-
-# Internal C flags
-override INTERNALCFLAGS := 	\
-	$(INTERNALFLAGS)		\
-	-std=c11				\
-
-# Internal CXX flags
-override INTERNALCXXFLAGS :=\
-	$(INTERNALFLAGS)		\
-	-std=c++17				\
-	-fno-exceptions			\
-	-fno-rtti				\
+	-std=c17
 
 # Internal linker flags
 override INTERNALLDFLAGS := 	\
@@ -72,27 +60,24 @@ override INTERNALNASMFLAGS :=	\
 	-f elf64
 
 # File globs
-override KERNEL_SRC := $(shell find kernel/ -type f -name '*.cpp')
-override KERNEL_OBJ := $(patsubst %.cpp,build/%.o,$(KERNEL_SRC))
-override HEADER_DEPS := $(patsubst %.cpp,build/%.d,$(KERNEL_SRC))
+override KERNEL_SRC := $(shell find kernel/ -type f -name '*.c')
+override KERNEL_OBJ := $(patsubst %.c,build/%.o,$(KERNEL_SRC))
+override KERNEL_H := $(shell find kernel/ -type f -name '*.h')
 
 #
 # Rules
 #
 
 .PHONY: all
-all: $(KERNEL)
+all: format $(KERNEL)
 
 $(KERNEL): $(KERNEL_OBJ)
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) $(INTERNALCXXFLAGS) $(KERNEL_OBJ) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
+	$(CC) $(CFLAGS) $(INTERNALCFLAGS) $(KERNEL_OBJ) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
 
-# Include header dependencies
--include $(HEADER_DEPS)
-
-$(KERNEL_OBJ): $(KERNEL_SRC)
+build/%.o: %.c $(KERNEL_H)
 	@mkdir -p $(@D)
-	$(CXX) $(CPPFLAGS) $(CFLAGS) $(INTERNALCXXFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 $(IMAGE): $(KERNEL) $(LIMINE)
 	@mkdir -p $(@D)
@@ -118,8 +103,20 @@ $(LIMINE):
 	make -C $@
 
 .PHONY: run
-run: $(IMAGE)
+run: format $(IMAGE)
 	qemu-system-x86_64 -hda $(IMAGE)
+
+.PHONY: format
+format: $(KERNEL_SRC) $(KERNEL_H)
+	clang-format -i -style=file $^
+
+.PHONY: docs
+docs:
+	doxygen
+
+.PHONY: docs-open
+docs-open: docs
+	firefox --new-tab build/doxygen/html/index.html
 
 .PHONY: clean
 clean:
