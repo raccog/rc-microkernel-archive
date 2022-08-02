@@ -64,6 +64,8 @@ override KERNEL_SRC := $(shell find kernel/ -type f -name '*.c')
 override KERNEL_OBJ := $(patsubst %.c,build/%.o,$(KERNEL_SRC))
 override KERNEL_H := $(shell find kernel/ -type f -name '*.h')
 
+override DEFAULT_H := kernel/stdint.h
+
 #
 # Rules
 #
@@ -77,7 +79,7 @@ $(KERNEL): $(KERNEL_OBJ)
 
 build/%.o: %.c $(KERNEL_H)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+	$(CC) -include $(DEFAULT_H) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 $(IMAGE): $(KERNEL) $(LIMINE)
 	@mkdir -p $(@D)

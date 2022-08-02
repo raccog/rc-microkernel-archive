@@ -3,6 +3,7 @@
  */
 
 #include "limine.h"
+#include "segmentation.h"
 #include "stdint.h"
 #include "terminal.h"
 
@@ -35,6 +36,9 @@ void _start() {
     // Test kernel text output
     kernel_set_terminal(terminal_request.response, terminal);
     kprintf("Starting rc-microkernel %s for x86-64...", KERNEL_VERSION);
+
+    // set gdt
+    kprint_gdt();
 
     // Halt
     done();
