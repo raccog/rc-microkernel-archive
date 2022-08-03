@@ -18,6 +18,14 @@ struct segment_descriptor {
 };
 
 /**
+ * A register pointing to a GDT.
+ */
+struct gdt_register {
+    u16 limit;
+    struct segment_descriptor *base;
+}; // __attribute__((packed));
+
+/**
  * Print all segments in the currently set GDT.
  */
 void kprint_gdt();
@@ -25,4 +33,4 @@ void kprint_gdt();
 /**
  * Returns the address of the current GDT.
  */
-extern struct segment_descriptor* kget_gdt();
+extern struct gdt_register kget_gdt();

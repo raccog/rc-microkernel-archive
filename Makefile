@@ -61,7 +61,9 @@ override INTERNALNASMFLAGS :=	\
 
 # File globs
 override KERNEL_SRC := $(shell find kernel/ -type f -name '*.c')
+override KERNEL_SRC_ASM := $(shell find kernel/ -type f -name '*.asm')
 override KERNEL_OBJ := $(patsubst %.c,build/%.o,$(KERNEL_SRC))
+override KERNEL_OBJ_ASM := $(patsubst %.asm,build/%.o,$(KERNEL_SRC_ASM))
 override KERNEL_H := $(shell find kernel/ -type f -name '*.h')
 
 override DEFAULT_H := kernel/stdint.h
@@ -73,13 +75,17 @@ override DEFAULT_H := kernel/stdint.h
 .PHONY: all
 all: format $(KERNEL)
 
-$(KERNEL): $(KERNEL_OBJ)
+$(KERNEL): $(KERNEL_OBJ) $(KERNEL_OBJ_ASM)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) $(INTERNALCFLAGS) $(KERNEL_OBJ) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
+	$(CC) $(CFLAGS) $(INTERNALCFLAGS) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@ $^
 
 build/%.o: %.c $(KERNEL_H)
 	@mkdir -p $(@D)
 	$(CC) -include $(DEFAULT_H) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+
+build/%.o: %.asm
+	@mkdir -p $(@D)
+	nasm -g -f elf64 -o $@ $<
 
 $(IMAGE): $(KERNEL) $(LIMINE)
 	@mkdir -p $(@D)

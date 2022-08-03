@@ -71,6 +71,41 @@ static void _parse_precision(va_list args,
     }
 }
 
+static void _print_uint(u64 value, struct _format_specifier *specifier) {
+    // print flag
+    if (specifier->force_sign) {
+        kputc('+');
+        ++printed_chars;
+    } else if (specifier->pad_sign) {
+        kputc(' ');
+        ++printed_chars;
+    }
+
+    // count digits
+    u32 digits = 19;
+    u64 compare = 1000000000000000000; // negative is used to compare
+    while (digits > 1 && compare > value) {
+        compare /= 10;
+        --digits;
+    }
+
+    // pad with zeros if specified
+    if (specifier->use_precision && specifier->precision > digits) {
+        for (u32 i = 0; i < specifier->precision - digits; ++i) {
+            kputc('0');
+            ++printed_chars;
+        }
+    }
+
+    // print integer digits
+    while (compare > 0) {
+        u64 digit = (value / compare) % 10;
+        compare /= 10;
+        kputc('0' + digit);
+        ++printed_chars;
+    }
+}
+
 static void _print_int(i64 value, struct _format_specifier *specifier) {
     // print flag
     if (value < 0) {
@@ -183,6 +218,12 @@ static int _print_argument(va_list args) {
         case 'i':
         case 'd':
             _print_int((i64)va_arg(args, i32), &specifier);
+            break;
+        case 'l':
+            _print_int(va_arg(args, i64), &specifier);
+            break;
+        case 'u':
+            _print_uint((u64)va_arg(args, u32), &specifier);
             break;
         case 'x':
             _print_hex(va_arg(args, u64), &specifier);
