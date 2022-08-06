@@ -17,10 +17,10 @@ typedef int32_t i32;
 typedef int64_t i64;
 
 /** An 8-bit unsigned integer. */
-typedef int8_t u8;
+typedef uint8_t u8;
 /** A 16-bit unsigned integer. */
-typedef int16_t u16;
+typedef uint16_t u16;
 /** A 32-bit unsigned integer. */
-typedef int32_t u32;
+typedef uint32_t u32;
 /** A 64-bit unsigned integer. */
-typedef int64_t u64;
+typedef uint64_t u64;

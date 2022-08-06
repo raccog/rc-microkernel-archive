@@ -4,6 +4,7 @@
 
 #include "limine.h"
 #include "segmentation.h"
+#include "serial.h"
 #include "stdint.h"
 #include "terminal.h"
 #include <limits.h>
@@ -37,7 +38,11 @@ extern "C" void _start() {
     kprintf("Starting rc-microkernel %s for x86-64...\n", KERNEL_VERSION);
 
     // set gdt
-    kprint_gdt();
+    // kprint_gdt();
+
+    // init serial device
+    kprintf("Serial: %i\n", kinit_serial());
+    kputc_serial('~');
 
     // Halt
     done();

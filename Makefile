@@ -114,7 +114,7 @@ $(LIMINE):
 
 .PHONY: run
 run: format $(IMAGE)
-	qemu-system-x86_64 -hda $(IMAGE)
+	qemu-system-x86_64 -hda $(IMAGE) -serial stdio
 
 .PHONY: format
 format: $(KERNEL_SRC) $(KERNEL_H)
