@@ -21,16 +21,18 @@ endef
 $(eval $(call DEFAULT_VAR,CC,clang))
 $(eval $(call DEFAULT_VAR,CXX,clang++))
 
-CFLAGS ?= -O2 -g -Wall -Wextra -Wpedantic
+CFLAGS ?=
 NASMFLAGS ?= -F dwarf -g
 LDFLAGS ?=
-CXXFLAGS ?=
+CXXFLAGS ?= -O2 -g -Wall -Wextra -Wpedantic
 
-# Internal C flags
-override INTERNALCFLAGS := 	\
+# Internal C++ flags
+override INTERNALCXXFLAGS := 	\
 	-I.					 	\
 	-ffreestanding			\
 	-fno-builtin			\
+	-fno-exceptions			\
+	-fno-rtti				\
 	-fno-stack-protector	\
 	-fno-stack-check		\
 	-fno-pie				\
@@ -45,8 +47,8 @@ override INTERNALCFLAGS := 	\
 	-mno-sse2				\
 	-mno-red-zone			\
 	-mcmodel=kernel			\
-	-MMD
-	-std=c17
+	-MMD					\
+	-std=c++20
 
 # Internal linker flags
 override INTERNALLDFLAGS := 	\
@@ -60,9 +62,9 @@ override INTERNALNASMFLAGS :=	\
 	-f elf64
 
 # File globs
-override KERNEL_SRC := $(shell find kernel/ -type f -name '*.c')
+override KERNEL_SRC := $(shell find kernel/ -type f -name '*.cpp')
 override KERNEL_SRC_ASM := $(shell find kernel/ -type f -name '*.asm')
-override KERNEL_OBJ := $(patsubst %.c,build/%.o,$(KERNEL_SRC))
+override KERNEL_OBJ := $(patsubst %.cpp,build/%.o,$(KERNEL_SRC))
 override KERNEL_OBJ_ASM := $(patsubst %.asm,build/%.o,$(KERNEL_SRC_ASM))
 override KERNEL_H := $(shell find kernel/ -type f -name '*.h')
 
@@ -77,11 +79,11 @@ all: format $(KERNEL)
 
 $(KERNEL): $(KERNEL_OBJ) $(KERNEL_OBJ_ASM)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) $(INTERNALCFLAGS) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) $(INTERNALCXXFLAGS) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@ $^
 
-build/%.o: %.c $(KERNEL_H)
+build/%.o: %.cpp $(KERNEL_H)
 	@mkdir -p $(@D)
-	$(CC) -include $(DEFAULT_H) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+	$(CXX) -include $(DEFAULT_H) $(CXXFLAGS) $(INTERNALCXXFLAGS) -c $< -o $@
 
 build/%.o: %.asm
 	@mkdir -p $(@D)

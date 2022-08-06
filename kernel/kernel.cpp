@@ -6,10 +6,11 @@
 #include "segmentation.h"
 #include "stdint.h"
 #include "terminal.h"
+#include <limits.h>
 
-#define KERNEL_VERSION "v0.0.1"
+constexpr const char *KERNEL_VERSION = "v0.0.1";
 
-static volatile struct limine_terminal_request terminal_request = {
+static volatile limine_terminal_request terminal_request = {
     LIMINE_TERMINAL_REQUEST, 0, 0, 0};
 
 static void done() {
@@ -18,12 +19,10 @@ static void done() {
     }
 }
 
-#include <limits.h>
-
 /**
  * Kernel start function.
  */
-void _start() {
+extern "C" void _start() {
     // Ensure terminal is available
     if (terminal_request.response == NULL ||
         terminal_request.response->terminal_count < 1) {
@@ -31,7 +30,7 @@ void _start() {
     }
 
     // Get limine terminal and test text output
-    struct limine_terminal *terminal = terminal_request.response->terminals[0];
+    limine_terminal *terminal = terminal_request.response->terminals[0];
 
     // Test kernel text output
     kernel_set_terminal(terminal_request.response, terminal);
