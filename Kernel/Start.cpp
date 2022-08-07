@@ -3,6 +3,7 @@
  */
 
 #include "External/limine.h"
+#include "LimineTerminal.h"
 #include "Segmentation.h"
 #include "Serial.h"
 #include "Stdint.h"
@@ -11,7 +12,7 @@
 constexpr const char *KERNEL_VERSION = "v0.0.1";
 
 static volatile limine_terminal_request terminal_request = {
-    LIMINE_TERMINAL_REQUEST, 0, 0, 0};
+    0 /*LIMINE_TERMINAL_REQUEST*/, 0, 0, 0};
 
 static void done() {
     for (;;) {
@@ -24,6 +25,7 @@ static void done() {
  */
 extern "C" void _start() {
     // Ensure terminal is available
+    /*
     if (terminal_request.response == NULL ||
         terminal_request.response->terminal_count < 1) {
         done();
@@ -38,6 +40,11 @@ extern "C" void _start() {
 
     // set gdt
     // kprint_gdt();
+    */
+
+    // init limine terminal
+    LimineTerminal terminal = LimineTerminal::default_terminal();
+    terminal.write("Hello limine terminal\nend");
 
     // init serial device
     kprintf("Serial: %i\n", kinit_serial());
