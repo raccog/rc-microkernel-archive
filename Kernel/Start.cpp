@@ -11,9 +11,6 @@
 
 constexpr const char *KERNEL_VERSION = "v0.0.1";
 
-static volatile limine_terminal_request terminal_request = {
-    0 /*LIMINE_TERMINAL_REQUEST*/, 0, 0, 0};
-
 static void done() {
     for (;;) {
         __asm__("hlt");
@@ -24,31 +21,16 @@ static void done() {
  * Kernel start function.
  */
 extern "C" void _start() {
-    // Ensure terminal is available
-    /*
-    if (terminal_request.response == NULL ||
-        terminal_request.response->terminal_count < 1) {
-        done();
-    }
-
-    // Get limine terminal and test text output
-    limine_terminal *terminal = terminal_request.response->terminals[0];
-
-    // Test kernel text output
-    kernel_set_terminal(terminal_request.response, terminal);
-    kprintf("Starting rc-microkernel %s for x86-64...\n", KERNEL_VERSION);
-
     // set gdt
     // kprint_gdt();
-    */
 
     // init limine terminal
     LimineTerminal terminal = LimineTerminal::default_terminal();
     terminal.write("Hello limine terminal\nend");
 
     // init serial device
-    kprintf("Serial: %i\n", kinit_serial());
-    kputc_serial('~');
+    Serial serial = Serial::default_serial();
+    serial.write("Hello serial\nend");
 
     // Halt
     done();
