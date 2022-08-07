@@ -15,7 +15,7 @@ LimineTerminal LimineTerminal::init_default() {
         panic();
     }
 
-    return LimineTerminal(0);
+    return LimineTerminal();
 }
 
 int LimineTerminal::write(const char *str) {

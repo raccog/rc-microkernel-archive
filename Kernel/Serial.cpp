@@ -5,6 +5,7 @@
 #include "Serial.h"
 
 #include "Panic.h"
+#include "Ports.h"
 
 int Serial::write(const char *str) {
     while (*str != '\0') {
