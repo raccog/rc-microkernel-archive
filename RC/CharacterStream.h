@@ -1,19 +1,6 @@
-/** \file
- * Interfaces for interacting with a character stream.
- */
-
 #pragma once
 
-class CharacterWriter {
-    virtual int write_line(const char *str);
-    virtual int write_char(char c);
-};
+#include "CharacterReader.h"
+#include "CharacterWriter.h"
 
-class CharacterReader {
-    //virtual const char* read_line();
-    virtual char read_char(); 
-};
-
-class CharacterStream : public CharacterWriter, public CharacterReader {
-
-};
+class CharacterStream : public CharacterWriter, public CharacterReader {};

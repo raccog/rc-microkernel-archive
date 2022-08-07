@@ -1,6 +1,6 @@
 # This makefile is based on the template at https://github.com/limine-bootloader/limine-barebones
 
-BUILD ?= build
+BUILD ?= Build
 CACHE ?= .cache
 override KERNEL := $(BUILD)/rc-microkernel.elf
 override IMAGE := $(BUILD)/image.hdd
@@ -64,8 +64,8 @@ override INTERNALNASMFLAGS :=	\
 # File globs
 override KERNEL_SRC := $(shell find Kernel/ -type f -name '*.cpp')
 override KERNEL_SRC_ASM := $(shell find Kernel/ -type f -name '*.asm')
-override KERNEL_OBJ := $(patsubst %.cpp,build/%.o,$(KERNEL_SRC))
-override KERNEL_OBJ_ASM := $(patsubst %.asm,build/%.o,$(KERNEL_SRC_ASM))
+override KERNEL_OBJ := $(patsubst %.cpp,$(BUILD)/%.o,$(KERNEL_SRC))
+override KERNEL_OBJ_ASM := $(patsubst %.asm,$(BUILD)/%.o,$(KERNEL_SRC_ASM))
 override KERNEL_H := $(shell find Kernel/ -type f -name '*.h')
 
 override DEFAULT_H := Kernel/Stdint.h
@@ -81,11 +81,11 @@ $(KERNEL): $(KERNEL_OBJ) $(KERNEL_OBJ_ASM)
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) $(INTERNALCXXFLAGS) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@ $^
 
-build/%.o: %.cpp $(KERNEL_H)
+$(BUILD)/%.o: %.cpp $(KERNEL_H)
 	@mkdir -p $(@D)
 	$(CXX) -include $(DEFAULT_H) $(CXXFLAGS) $(INTERNALCXXFLAGS) -c $< -o $@
 
-build/%.o: %.asm
+$(BUILD)/%.o: %.asm
 	@mkdir -p $(@D)
 	nasm -g -f elf64 -o $@ $<
 
@@ -126,7 +126,7 @@ docs:
 
 .PHONY: docs-open
 docs-open: docs
-	firefox --new-tab build/doxygen/html/index.html
+	firefox --new-tab $(BUILD)/doxygen/html/index.html
 
 .PHONY: clean
 clean:
