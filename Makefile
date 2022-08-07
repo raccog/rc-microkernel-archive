@@ -7,6 +7,8 @@ override IMAGE := $(BUILD)/image.hdd
 override LIMINE := $(CACHE)/limine
 override MOUNT := $(CACHE)/img_mount
 
+override LOG_FILE := $(BUILD)/kernel.log
+
 # Convenience macro to reliably declare overridable command variables.
 define DEFAULT_VAR =
 	ifeq ($(origin $1), default)
@@ -112,9 +114,25 @@ $(LIMINE):
 	git clone https://github.com/limine-bootloader/limine.git --branch=v3.0-branch-binary --depth=1 $@
 	make -C $@
 
+# Save previous log
+.PHONY: save-log
+save-log:
+	if [[ -f $(LOG_FILE) ]]; then mv $(LOG_FILE) $(BUILD)/kernel.old.log; fi
+
+# Output serial to console as well as log
 .PHONY: run
-run: format $(IMAGE)
-	qemu-system-x86_64 -hda $(IMAGE) -serial stdio
+run: format $(IMAGE) save-log
+	qemu-system-x86_64 \
+		-hda $(IMAGE) \
+		-chardev stdio,id=char0,logfile=$(LOG_FILE) \
+		-serial chardev:char0
+
+# Output serial to only log
+.PHONY: run-serial
+run-serial: format $(IMAGE) save-log
+	qemu-system-x86_64 \
+		-hda $(IMAGE) \
+		-serial file:$(LOG_FILE)
 
 .PHONY: format
 format: $(KERNEL_SRC) $(KERNEL_H)
