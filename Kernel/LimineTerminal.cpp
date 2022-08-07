@@ -1,14 +1,14 @@
 #include "LimineTerminal.h"
 
 #include "Panic.h"
-#include "Terminal.h"
+#include "RC/String.h"
 
 // TODO: Move to limine elf section
 // extern "C"
 static volatile limine_terminal_request TERMINAL_REQUEST = {
     LIMINE_TERMINAL_REQUEST, 0, 0, 0};
 
-LimineTerminal LimineTerminal::default_terminal() {
+LimineTerminal LimineTerminal::init_default() {
     // Ensure terminal is available
     if (TERMINAL_REQUEST.response == nullptr ||
         TERMINAL_REQUEST.response->terminal_count < 1) {

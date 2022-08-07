@@ -62,13 +62,13 @@ override INTERNALNASMFLAGS :=	\
 	-f elf64
 
 # File globs
-override KERNEL_SRC := $(shell find Kernel/ -type f -name '*.cpp')
+override KERNEL_SRC := $(shell find {Kernel/,RC/} -type f -name '*.cpp')
 override KERNEL_SRC_ASM := $(shell find Kernel/ -type f -name '*.asm')
 override KERNEL_OBJ := $(patsubst %.cpp,$(BUILD)/%.o,$(KERNEL_SRC))
 override KERNEL_OBJ_ASM := $(patsubst %.asm,$(BUILD)/%.o,$(KERNEL_SRC_ASM))
-override KERNEL_H := $(shell find Kernel/ -type f -name '*.h')
+override KERNEL_H := $(shell find {Kernel/,RC/} -type f -name '*.h')
 
-override DEFAULT_H := Kernel/Stdint.h
+override STDINT_H := RC/Stdint.h
 
 #
 # Rules
@@ -83,7 +83,7 @@ $(KERNEL): $(KERNEL_OBJ) $(KERNEL_OBJ_ASM)
 
 $(BUILD)/%.o: %.cpp $(KERNEL_H)
 	@mkdir -p $(@D)
-	$(CXX) -include $(DEFAULT_H) $(CXXFLAGS) $(INTERNALCXXFLAGS) -c $< -o $@
+	$(CXX) -include $(STDINT_H) $(CXXFLAGS) $(INTERNALCXXFLAGS) -c $< -o $@
 
 $(BUILD)/%.o: %.asm
 	@mkdir -p $(@D)

@@ -1,6 +1,6 @@
 #pragma once
 
 class CharacterReader {
-    //virtual const char* read_line();
-    virtual char read_char(); 
+    // virtual const char* read_line();
+    virtual char read_char();
 };

@@ -1,3 +1,3 @@
 #pragma once
 
-void panic();
+[[noreturn]] void panic();

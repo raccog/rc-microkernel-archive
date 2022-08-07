@@ -6,12 +6,10 @@
 #include "LimineTerminal.h"
 #include "Segmentation.h"
 #include "Serial.h"
-#include "Stdint.h"
-#include "Terminal.h"
 
 constexpr const char *KERNEL_VERSION = "v0.0.1";
 
-static void done() {
+[[noreturn]] static void done() {
     for (;;) {
         __asm__("hlt");
     }
@@ -21,15 +19,12 @@ static void done() {
  * Kernel start function.
  */
 extern "C" void _start() {
-    // set gdt
-    // kprint_gdt();
-
     // init limine terminal
-    LimineTerminal terminal = LimineTerminal::default_terminal();
+    LimineTerminal terminal = LimineTerminal::init_default();
     terminal.write("Hello limine terminal\nend");
 
     // init serial device
-    Serial serial = Serial::default_serial();
+    Serial serial = Serial::init_default();
     serial.write("Hello serial\nend");
 
     // Halt

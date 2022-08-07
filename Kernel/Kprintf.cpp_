@@ -2,8 +2,6 @@
  * Kernel printf implementation.
  */
 
-#include "Terminal.h"
-
 #include <stdarg.h>
 #include <stdbool.h>
 
