@@ -2,7 +2,7 @@
  * COM port driver implementation.
  */
 
-#include "serial.h"
+#include "Serial.h"
 
 constexpr u16 PORT_COM1 = 0x3f8;
 

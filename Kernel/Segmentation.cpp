@@ -2,9 +2,9 @@
  * Segmentation functions.
  */
 
-#include "segmentation.h"
+#include "Segmentation.h"
 
-#include "terminal.h"
+#include "Terminal.h"
 
 void kprint_gdt() {
     struct gdt_register gdtr = kget_gdt();

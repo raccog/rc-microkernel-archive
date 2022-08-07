@@ -2,7 +2,7 @@
  * Kernel printf implementation.
  */
 
-#include "terminal.h"
+#include "Terminal.h"
 
 #include <stdarg.h>
 #include <stdbool.h>

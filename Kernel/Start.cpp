@@ -2,12 +2,11 @@
  * Kernel start function.
  */
 
-#include "limine.h"
-#include "segmentation.h"
-#include "serial.h"
-#include "stdint.h"
-#include "terminal.h"
-#include <limits.h>
+#include "External/limine.h"
+#include "Segmentation.h"
+#include "Serial.h"
+#include "Stdint.h"
+#include "Terminal.h"
 
 constexpr const char *KERNEL_VERSION = "v0.0.1";
 

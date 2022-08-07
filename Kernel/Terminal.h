@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "limine.h"
-#include "stdint.h"
+#include "External/limine.h"
+#include "Stdint.h"
 
 /**
  * Sets a limine terminal as global kernel stdout.

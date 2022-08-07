@@ -2,7 +2,7 @@
  * Kernel text output implementation.
  */
 
-#include "terminal.h"
+#include "Terminal.h"
 
 // Global limine text buffer
 static struct limine_terminal *TERMINAL = NULL;

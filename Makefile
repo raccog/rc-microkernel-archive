@@ -55,20 +55,20 @@ override INTERNALLDFLAGS := 	\
 	-nostdlib					\
 	-static						\
 	-Wl,-z,max-page-size=0x1000	\
-	-Wl,-T,kernel/linker.ld
+	-Wl,-T,Kernel/linker.ld
 
 # Internal NASM flags
 override INTERNALNASMFLAGS :=	\
 	-f elf64
 
 # File globs
-override KERNEL_SRC := $(shell find kernel/ -type f -name '*.cpp')
-override KERNEL_SRC_ASM := $(shell find kernel/ -type f -name '*.asm')
+override KERNEL_SRC := $(shell find Kernel/ -type f -name '*.cpp')
+override KERNEL_SRC_ASM := $(shell find Kernel/ -type f -name '*.asm')
 override KERNEL_OBJ := $(patsubst %.cpp,build/%.o,$(KERNEL_SRC))
 override KERNEL_OBJ_ASM := $(patsubst %.asm,build/%.o,$(KERNEL_SRC_ASM))
-override KERNEL_H := $(shell find kernel/ -type f -name '*.h')
+override KERNEL_H := $(shell find Kernel/ -type f -name '*.h')
 
-override DEFAULT_H := kernel/stdint.h
+override DEFAULT_H := Kernel/Stdint.h
 
 #
 # Rules
