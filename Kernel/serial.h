@@ -1,7 +1,3 @@
-/** \file
- * Standardized COM port driver.
- */
-
 #pragma once
 
 #define COM1_PORT 0x3f8

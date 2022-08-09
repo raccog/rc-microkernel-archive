@@ -1,11 +1,7 @@
-/** \file
- * Segmentation functions.
- */
-
 #include "segmentation.h"
 
-void kprint_gdt() {
-    struct gdt_register gdtr = kget_gdt();
-    struct segment_descriptor *gdt = gdtr.base;
+void x86_64_print_gdt() {
+    struct x86_64_gdt_register gdtr = x86_64_get_gdt();
+    struct x86_64_segment_descriptor *gdt = gdtr.base;
     u16 limit = gdtr.limit;
 }

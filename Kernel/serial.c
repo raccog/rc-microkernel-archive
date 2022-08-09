@@ -1,7 +1,3 @@
-/** \file
- * COM port driver implementation.
- */
-
 #include "serial.h"
 
 #include "ports.h"
@@ -57,6 +53,7 @@ void serial_write_int(i64 value) {
     if (value == 0) {
         serial_write_char('0');
     } else {
+        // smallest signed integer that is a power of 10
         i64 comparator = -1000000000000000000;
 
         // print negative sign if needed
@@ -94,7 +91,8 @@ void serial_write_uint(u64 value) {
     if (value == 0) {
         serial_write_char('0');
     } else {
-        u64 comparator = 10000000000000000000;
+        // largest unsigned integer that is a power of 10
+        u64 comparator = 10000000000000000000ul;
 
         // move comparator to first digit of value
         while (comparator > value) {

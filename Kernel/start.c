@@ -1,7 +1,3 @@
-/** \file
- * Kernel start function.
- */
-
 #include "External/limine.h"
 #include "panic.h"
 #include "segmentation.h"

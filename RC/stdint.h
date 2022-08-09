@@ -1,7 +1,3 @@
-/** \file
- * Signed and unsigned integer typedefs.
- */
-
 #pragma once
 
 #include <stddef.h>
