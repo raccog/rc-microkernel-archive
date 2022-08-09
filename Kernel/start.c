@@ -3,18 +3,15 @@
  */
 
 #include "External/limine.h"
+#include "panic.h"
 #include "segmentation.h"
 #include "serial.h"
 #include "terminal_limine.h"
 
 #define KERNEL_VERSION "v0.0.1"
-const char *HELLO = "Hi serial\n";
-
-static void done() {
-    for (;;) {
-        __asm__("hlt");
-    }
-}
+#define BOOT_MESSAGE                                                           \
+    "rc-microkernel version (" KERNEL_VERSION ") compiled on " __DATE__        \
+    " at " __TIME__ "\n"
 
 /**
  * Kernel start function.
@@ -22,19 +19,16 @@ static void done() {
 void _start() {
     // init limine terminal
     terminal_limine_init();
-    terminal_limine_write("Hello limine terminal\nend\n");
+    terminal_limine_write(BOOT_MESSAGE);
 
     // init serial device
-    int result = serial_init();
-    if (result != 0) {
-        terminal_limine_write("serial init failed\n");
-        done();
+    int error = serial_init();
+    if (error != 0) {
+        terminal_limine_write("FAILED: Serial initialization on port COM1!\n");
+        panic();
     }
-
-    serial_write("Hello serial\nend\n");
-    // serial_write(HELLO);
-    // serial_write_char('~');
+    serial_write(BOOT_MESSAGE);
 
     // Halt
-    done();
+    panic();
 }

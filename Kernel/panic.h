@@ -1,3 +1,3 @@
 #pragma once
 
-void panic();
+__attribute__((noreturn)) void panic();
