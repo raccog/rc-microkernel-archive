@@ -1,4 +1,4 @@
-#include "Panic.h"
+#include "panic.h"
 
 void panic() {
     for (;;) {

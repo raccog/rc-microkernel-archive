@@ -1,4 +1,4 @@
-# This makefile is based on the template at https://github.com/limine-bootloader/limine-barebones
+# This makefile is inspired by the template at https://github.com/limine-bootloader/limine-barebones
 
 BUILD ?= Build
 CACHE ?= .cache
@@ -9,32 +9,20 @@ override MOUNT := $(CACHE)/img_mount
 
 override LOG_FILE := $(BUILD)/kernel.log
 
-# Convenience macro to reliably declare overridable command variables.
-define DEFAULT_VAR =
-	ifeq ($(origin $1), default)
-		override $(1) := $(2)
-	endif
-	ifeq ($(origin $1), undefined)
-		override $(1) := $(2)
-	endif
-endef
-
 # Use clang as default compiler
-$(eval $(call DEFAULT_VAR,CC,clang))
-$(eval $(call DEFAULT_VAR,CXX,clang++))
+override CC := clang
+override CXX := clang++
 
-CFLAGS ?=
+CFLAGS ?= -O2 -g -Wall -Wextra -Wpedantic
 NASMFLAGS ?= -F dwarf -g
 LDFLAGS ?=
-CXXFLAGS ?= -O2 -g -Wall -Wextra -Wpedantic
 
-# Internal C++ flags
-override INTERNALCXXFLAGS := 	\
+# Internal C flags that should not be changed by the user
+override INTERNALCFLAGS := 	\
 	-I.					 	\
+	-std=c17				\
 	-ffreestanding			\
 	-fno-builtin			\
-	-fno-exceptions			\
-	-fno-rtti				\
 	-fno-stack-protector	\
 	-fno-stack-check		\
 	-fno-pie				\
@@ -49,8 +37,7 @@ override INTERNALCXXFLAGS := 	\
 	-mno-sse2				\
 	-mno-red-zone			\
 	-mcmodel=kernel			\
-	-MMD					\
-	-std=c++20
+	-MMD
 
 # Internal linker flags
 override INTERNALLDFLAGS := 	\
@@ -64,13 +51,14 @@ override INTERNALNASMFLAGS :=	\
 	-f elf64
 
 # File globs
-override KERNEL_SRC := $(shell find {Kernel/,RC/} -type f -name '*.cpp')
+override KERNEL_SRC := $(shell find {Kernel/,RC/} -type f -name '*.c')
 override KERNEL_SRC_ASM := $(shell find Kernel/ -type f -name '*.asm')
-override KERNEL_OBJ := $(patsubst %.cpp,$(BUILD)/%.o,$(KERNEL_SRC))
+override KERNEL_OBJ := $(patsubst %.c,$(BUILD)/%.o,$(KERNEL_SRC))
 override KERNEL_OBJ_ASM := $(patsubst %.asm,$(BUILD)/%.o,$(KERNEL_SRC_ASM))
 override KERNEL_H := $(shell find {Kernel/,RC/} -type f -name '*.h')
 
-override STDINT_H := RC/Stdint.h
+override DEFAULT_H := RC/stdint.h stdbool.h
+override DEFAULT_H := $(patsubst %.h,-include %.h,$(DEFAULT_H))
 
 #
 # Rules
@@ -81,15 +69,15 @@ all: format $(KERNEL)
 
 $(KERNEL): $(KERNEL_OBJ) $(KERNEL_OBJ_ASM)
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) $(INTERNALCXXFLAGS) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(INTERNALCFLAGS) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@ $^
 
-$(BUILD)/%.o: %.cpp $(KERNEL_H)
+$(BUILD)/%.o: %.c $(KERNEL_H)
 	@mkdir -p $(@D)
-	$(CXX) -include $(STDINT_H) $(CXXFLAGS) $(INTERNALCXXFLAGS) -c $< -o $@
+	$(CC) $(DEFAULT_H) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 $(BUILD)/%.o: %.asm
 	@mkdir -p $(@D)
-	nasm -g -f elf64 -o $@ $<
+	nasm $(NASMFLAGS) $(INTERNALNASMFLAGS) -o $@ $<
 
 $(IMAGE): $(KERNEL) $(LIMINE)
 	@mkdir -p $(@D)
@@ -123,6 +111,7 @@ save-log:
 .PHONY: run
 run: format $(IMAGE) save-log
 	qemu-system-x86_64 \
+		-m 256M \
 		-hda $(IMAGE) \
 		-chardev stdio,id=char0,logfile=$(LOG_FILE) \
 		-serial chardev:char0
@@ -131,6 +120,7 @@ run: format $(IMAGE) save-log
 .PHONY: run-serial
 run-serial: format $(IMAGE) save-log
 	qemu-system-x86_64 \
+		-m 256M \
 		-hda $(IMAGE) \
 		-serial file:$(LOG_FILE)
 

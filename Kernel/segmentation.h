@@ -33,4 +33,4 @@ void kprint_gdt();
 /**
  * Returns the address of the current GDT.
  */
-extern "C" struct gdt_register kget_gdt();
+struct gdt_register kget_gdt();

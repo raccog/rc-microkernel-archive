@@ -1,4 +1,4 @@
-#include "String.h"
+#include "string.h"
 
 u64 strlen(const char *str) {
     u64 len = 0;
