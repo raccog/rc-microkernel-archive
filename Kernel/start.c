@@ -8,6 +8,8 @@
 #include "serial.h"
 #include "terminal_limine.h"
 
+#include <limits.h>
+
 #define KERNEL_VERSION "v0.0.1"
 #define BOOT_MESSAGE                                                           \
     "rc-microkernel version (" KERNEL_VERSION ") compiled on " __DATE__        \
@@ -28,6 +30,23 @@ void _start() {
         panic();
     }
     serial_write(BOOT_MESSAGE);
+
+    serial_write("Signed integers:\n");
+    serial_write_int(0);
+    serial_write_int(-1234567890);
+    serial_write_int(LLONG_MAX);
+    serial_write_int(LLONG_MIN);
+
+    serial_write("Unsigned integers:\n");
+    serial_write_uint(0);
+    serial_write_uint(1234567890);
+    serial_write_uint(ULONG_MAX);
+
+    serial_write("Hex integers:\n");
+    serial_write_hex(0xdeadbeef);
+    serial_write_hex(0xdeadbeefdeadbeef);
+    serial_write_hex(0x0);
+    serial_write_hex(0xffffffffffffffff);
 
     // Halt
     panic();

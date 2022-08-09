@@ -90,6 +90,53 @@ void serial_write_int(i64 value) {
     serial_write_char('\n');
 }
 
-void serial_write_uint(u64 value) {}
+void serial_write_uint(u64 value) {
+    if (value == 0) {
+        serial_write_char('0');
+    } else {
+        u64 comparator = 10000000000000000000;
 
-void serial_write_hex(u64 value) {}
+        // move comparator to first digit of value
+        while (comparator > value) {
+            comparator /= 10;
+        }
+
+        // print digits
+        while (comparator > 0) {
+            char digit = '0' + (char)((value / comparator) % 10);
+            serial_write_char(digit);
+            comparator /= 10;
+        }
+    }
+
+    serial_write_char('\n');
+}
+
+void serial_write_hex(u64 value) {
+    serial_write("0x");
+
+    if (value == 0) {
+        serial_write_char('0');
+    } else {
+        u64 bit_size = 64;
+
+        // move comparator to first digit of value
+        while (((value >> (bit_size - 4)) & 0xf) == 0) {
+            bit_size -= 4;
+        }
+
+        // print digits
+        while (bit_size >= 4) {
+            char digit = (char)((value >> (bit_size - 4)) & 0xf);
+            bit_size -= 4;
+            if (digit > 9) {
+                digit += 'a' - 0xa;
+            } else {
+                digit += '0';
+            }
+            serial_write_char(digit);
+        }
+    }
+
+    serial_write_char('\n');
+}
