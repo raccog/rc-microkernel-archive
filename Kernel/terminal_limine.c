@@ -1,7 +1,8 @@
-#include "terminal_limine.h"
+#include "terminal.h"
 
 #include "External/limine.h"
 #include "RC/string.h"
+#include "character_device.h"
 #include "panic.h"
 
 // TODO: Move to limine elf section
@@ -10,19 +11,21 @@ static volatile struct limine_terminal_request TERMINAL_REQUEST = {
 
 static struct limine_terminal *TERMINAL0 = NULL;
 
-void terminal_limine_init() {
-    if (TERMINAL0)
-        return;
-
+int terminal_init() {
     // ensure terminal is available
     if (!TERMINAL_REQUEST.response || !TERMINAL_REQUEST.response->terminals ||
         TERMINAL_REQUEST.response->terminal_count < 1)
-        panic();
+        return -1;
 
     TERMINAL0 = TERMINAL_REQUEST.response->terminals[0];
+
+    stdout = (struct kernel_chardev){.write = &terminal_write,
+                                     .write_char = &terminal_write_char};
+
+    return 0;
 }
 
-int terminal_limine_write(const char *str) {
+int terminal_write(const char *str) {
     u64 len = strlen(str);
     if (!TERMINAL0)
         return -1;
@@ -30,7 +33,7 @@ int terminal_limine_write(const char *str) {
     return 0;
 }
 
-int terminal_limine_write_char(char c) {
+int terminal_write_char(char c) {
     if (!TERMINAL0)
         return -1;
     TERMINAL_REQUEST.response->write(TERMINAL0, &c, 1);

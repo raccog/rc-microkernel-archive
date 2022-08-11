@@ -1,5 +1,6 @@
 #include "serial.h"
 
+#include "character_device.h"
 #include "ports.h"
 
 int serial_init() {
@@ -25,6 +26,9 @@ int serial_init() {
     // set normal operation mode
     // (not-loopback with IRQs enabled and OUT#1 and OUT#2 bits enabled)
     outb(COM1_PORT + 4, 0xf);
+
+    stddebug = (struct kernel_chardev){.write = &serial_write,
+                                       .write_char = &serial_write_char};
 
     return 0;
 }
