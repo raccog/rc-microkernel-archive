@@ -1,3 +1,5 @@
+#ifdef BOOTLOADER_LIMINE
+
 #include "terminal.h"
 
 #include "External/limine.h"
@@ -39,3 +41,5 @@ int terminal_write_char(char c) {
     TERMINAL_REQUEST.response->write(TERMINAL0, &c, 1);
     return 0;
 }
+
+#endif

@@ -1,3 +1,5 @@
+#ifdef ARCH_x86_64
+
 #pragma once
 
 #define COM1_PORT 0x3f8
@@ -24,3 +26,5 @@ void serial_write_uint(u64 value);
  * Print hex integer to serial output.
  */
 void serial_write_hex(u64 value);
+
+#endif

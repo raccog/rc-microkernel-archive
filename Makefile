@@ -17,9 +17,11 @@ CFLAGS ?= -O2 -g -Wall -Wextra -Wpedantic
 NASMFLAGS ?= -F dwarf -g
 LDFLAGS ?=
 
+KERNEL_FLAGS ?= -DARCH_x86_64 -DBOOTLOADER_LIMINE -IInclude/Kernel
+
 # Internal C flags that should not be changed by the user
 override INTERNALCFLAGS := 	\
-	-I.					 	\
+	-IInclude				\
 	-std=c17				\
 	-ffreestanding			\
 	-fno-builtin			\
@@ -69,11 +71,11 @@ all: format $(KERNEL)
 
 $(KERNEL): $(KERNEL_OBJ) $(KERNEL_OBJ_ASM)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) $(INTERNALCFLAGS) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(KERNEL_FLAGS) $(INTERNALCFLAGS) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@ $^
 
 $(BUILD)/%.o: %.c $(KERNEL_H)
 	@mkdir -p $(@D)
-	$(CC) $(DEFAULT_H) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+	$(CC) $(DEFAULT_H) $(CFLAGS) $(KERNEL_FLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
 $(BUILD)/%.o: %.asm
 	@mkdir -p $(@D)

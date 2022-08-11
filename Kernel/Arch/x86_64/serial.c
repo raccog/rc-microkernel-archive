@@ -1,7 +1,9 @@
-#include "serial.h"
+#ifdef ARCH_x86_64
 
+#include "Arch/x86_64/serial.h"
+
+#include "Arch/x86_64/ports.h"
 #include "character_device.h"
-#include "ports.h"
 
 int serial_init() {
     // Taken from https://wiki.osdev.org/Serial_Ports#Initialization
@@ -142,3 +144,5 @@ void serial_write_hex(u64 value) {
 
     serial_write_char('\n');
 }
+
+#endif
