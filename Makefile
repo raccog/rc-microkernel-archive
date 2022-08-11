@@ -1,64 +1,71 @@
 # This makefile is inspired by the template at https://github.com/limine-bootloader/limine-barebones
 
-BUILD ?= Build
-CACHE ?= .cache
-override KERNEL := $(BUILD)/rc-microkernel.elf
-override IMAGE := $(BUILD)/image.hdd
-override LIMINE := $(CACHE)/limine
-override MOUNT := $(CACHE)/img_mount
+BUILDDIR ?= Build
+CACHEDIR ?= .cache
 
-override LOG_FILE := $(BUILD)/kernel.log
+#
+# Variables that cannot be changed by the user
+#
 
-# Use clang as default compiler
+override KERNEL_IMAGE := $(BUILDDIR)/rc-microkernel.elf
+override INSTALL_DISK := $(BUILDDIR)/image.hdd
+override MOUNTDIR := $(CACHEDIR)/img_mount
+override LOG_FILE := $(BUILDDIR)/kernel.log
+
+override LIMINEDIR := $(CACHEDIR)/limine
+
 override CC := clang
 override CXX := clang++
 
-CFLAGS ?= -O2 -g -Wall -Wextra -Wpedantic
-NASMFLAGS ?= -F dwarf -g
+override DEFAULT_ARCH := x86_64
+
+#
+# Variables that can be changed by the user
+#
+
+ARCH ?= $(DEFAULT_ARCH)
+ARCHDIR := Arch/$(ARCH)
+
+BOOTLOADER ?= Limine
+BOOTLOADERDIR ?= Bootloader/$(BOOTLOADER)
+
+include Kernel/Makefile
+include Kernel/$(ARCHDIR)/Makefile
+include Kernel/$(BOOTLOADERDIR)/Makefile
+
+include RC/Makefile
+
+override KERNEL_H := $(shell find Include/ -type f -name '*.h')
+
+CFLAGS ?= -O2 -g -Wall -Wextra -Wpedantic -IInclude -std=c17 \
+	--target=$(ARCH_TRIPLE) -DARCH_$(ARCH)
+CPPFLAGS ?=
+NASMFLAGS ?= -F dwarf -g -f elf64
 LDFLAGS ?=
 
-KERNEL_FLAGS ?= -DARCH_x86_64 -DBOOTLOADER_LIMINE -IInclude/Kernel
-
 # Internal C flags that should not be changed by the user
-override INTERNALCFLAGS := 	\
-	-IInclude				\
-	-std=c17				\
+override KERNEL_CFLAGS := 	\
+	-IInclude/Kernel		\
 	-ffreestanding			\
 	-fno-builtin			\
-	-fno-stack-protector	\
-	-fno-stack-check		\
 	-fno-pie				\
 	-fno-pic				\
-	-m64					\
-	--target=x86_64-pc-none-elf \
-	-march=x86-64			\
 	-mabi=sysv				\
-	-mno-80387				\
-	-mno-mmx				\
-	-mno-sse				\
-	-mno-sse2				\
-	-mno-red-zone			\
 	-mcmodel=kernel			\
 	-MMD
 
 # Internal linker flags
-override INTERNALLDFLAGS := 	\
+override KERNEL_LDFLAGS := 		\
 	-nostdlib					\
 	-static						\
 	-Wl,-z,max-page-size=0x1000	\
 	-Wl,-T,Kernel/linker.ld
 
-# Internal NASM flags
-override INTERNALNASMFLAGS :=	\
-	-f elf64
-
 # File globs
-override KERNEL_SRC := $(shell find {Kernel/,RC/} -type f -name '*.c')
-override KERNEL_SRC_ASM := $(shell find Kernel/ -type f -name '*.asm')
-override KERNEL_OBJ := $(patsubst %.c,$(BUILD)/%.o,$(KERNEL_SRC))
-override KERNEL_OBJ_ASM := $(patsubst %.asm,$(BUILD)/%.o,$(KERNEL_SRC_ASM))
-override KERNEL_H := $(shell find {Kernel/,RC/} -type f -name '*.h')
+override KERNEL_OBJ := $(patsubst %.c,$(BUILDDIR)/%.o,$(KERNEL_SRC))
+override KERNEL_OBJ_ASM := $(patsubst %.asm,$(BUILDDIR)/%.o,$(KERNEL_SRC_ASM))
 
+override KERNEL_DEPS := $(KERNEL_SRC:.c=.d) $(KERNEL_SRC_ASM:.asm=.d)
 override DEFAULT_H := RC/stdint.h stdbool.h
 override DEFAULT_H := $(patsubst %.h,-include %.h,$(DEFAULT_H))
 
@@ -67,39 +74,41 @@ override DEFAULT_H := $(patsubst %.h,-include %.h,$(DEFAULT_H))
 #
 
 .PHONY: all
-all: format $(KERNEL)
+all: format $(KERNEL_IMAGE)
 
-$(KERNEL): $(KERNEL_OBJ) $(KERNEL_OBJ_ASM)
+$(KERNEL_IMAGE): $(KERNEL_OBJ) $(KERNEL_OBJ_ASM)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) $(KERNEL_FLAGS) $(INTERNALCFLAGS) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(KERNEL_CFLAGS) $(ARCH_CFLAGS) $(LDFLAGS) $(KERNEL_LDFLAGS) -o $@ $^
 
-$(BUILD)/%.o: %.c $(KERNEL_H)
+-include $(KERNEL_DEPS)
+
+$(BUILDDIR)/%.o: %.c
 	@mkdir -p $(@D)
-	$(CC) $(DEFAULT_H) $(CFLAGS) $(KERNEL_FLAGS) $(INTERNALCFLAGS) -c $< -o $@
+	$(CC) $(DEFAULT_H) $(CFLAGS) $(KERNEL_CFLAGS) $(ARCH_CFLAGS) -c $< -o $@
 
-$(BUILD)/%.o: %.asm
+$(BUILDDIR)/%.o: %.asm
 	@mkdir -p $(@D)
-	nasm $(NASMFLAGS) $(INTERNALNASMFLAGS) -o $@ $<
+	nasm $(NASMFLAGS) $(KERNEL_NASMFLAGS) -o $@ $<
 
-$(IMAGE): $(KERNEL) $(LIMINE)
+$(INSTALL_DISK): $(KERNEL_IMAGE) $(LIMINEDIR)
 	@mkdir -p $(@D)
 	dd if=/dev/zero bs=1M count=0 seek=64 of=$@
 	parted -s $@ mklabel gpt
 	parted -s $@ mkpart ESP fat32 2048s 100%
 	parted -s $@ set 1 esp on
-	$(LIMINE)/limine-deploy $@
+	$(LIMINEDIR)/limine-deploy $@
 	USED_LOOPBACK=$$(sudo losetup -Pf --show $@) ;\
 	sudo mkfs.fat -F 32 $${USED_LOOPBACK}p1 ;\
-	mkdir -p $(MOUNT) ;\
-	sudo mount $${USED_LOOPBACK}p1 $(MOUNT) ;\
-	sudo mkdir -p $(MOUNT)/EFI/BOOT ;\
-	sudo cp -v $(KERNEL) limine.cfg $(LIMINE)/limine.sys $(MOUNT) ;\
-	sudo cp -v $(LIMINE)/BOOTX64.EFI $(MOUNT)/EFI/BOOT ;\
+	mkdir -p $(MOUNTDIR) ;\
+	sudo mount $${USED_LOOPBACK}p1 $(MOUNTDIR) ;\
+	sudo mkdir -p $(MOUNTDIR)/EFI/BOOT ;\
+	sudo cp -v $(KERNEL_IMAGE) limine.cfg $(LIMINEDIR)/limine.sys $(MOUNTDIR) ;\
+	sudo cp -v $(LIMINEDIR)/BOOTX64.EFI $(MOUNTDIR)/EFI/BOOT ;\
 	sync ;\
-	sudo umount $(MOUNT) ;\
+	sudo umount $(MOUNTDIR) ;\
 	sudo losetup -d $$USED_LOOPBACK
 
-$(LIMINE):
+$(LIMINEDIR):
 	@mkdir -p $(@D)
 	git clone https://github.com/limine-bootloader/limine.git --branch=v3.0-branch-binary --depth=1 $@
 	make -C $@
@@ -107,23 +116,23 @@ $(LIMINE):
 # Save previous log
 .PHONY: save-log
 save-log:
-	if [[ -f $(LOG_FILE) ]]; then mv $(LOG_FILE) $(BUILD)/kernel.old.log; fi
+	if [[ -f $(LOG_FILE) ]]; then mv $(LOG_FILE) $(BUILDDIR)/kernel.old.log; fi
 
 # Output serial to console as well as log
 .PHONY: run
-run: format $(IMAGE) save-log
+run: format $(INSTALL_DISK) save-log
 	qemu-system-x86_64 \
 		-m 256M \
-		-hda $(IMAGE) \
+		-hda $(INSTALL_DISK) \
 		-chardev stdio,id=char0,logfile=$(LOG_FILE) \
 		-serial chardev:char0
 
 # Output serial to only log
 .PHONY: run-serial
-run-serial: format $(IMAGE) save-log
+run-serial: format $(INSTALL_DISK) save-log
 	qemu-system-x86_64 \
 		-m 256M \
-		-hda $(IMAGE) \
+		-hda $(INSTALL_DISK) \
 		-serial file:$(LOG_FILE)
 
 .PHONY: format
@@ -136,12 +145,12 @@ docs:
 
 .PHONY: docs-open
 docs-open: docs
-	firefox --new-tab $(BUILD)/doxygen/html/index.html
+	firefox --new-tab $(BUILDDIR)/doxygen/html/index.html
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD)
+	rm -rf $(BUILDDIR)
 
 .PHONY: nuke
 nuke: clean
-	rm -rf $(CACHE)
+	rm -rf $(CACHEDIR)
