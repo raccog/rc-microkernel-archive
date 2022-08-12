@@ -1,9 +1,14 @@
 # Todo List In Order
 
-* Stdlib string formatting
-* Exception handling
-* Stdlib heap
-* SATA driver
+## Short-term
+
+* Stdlib string formatting (printf implementation)
+* Memory Segmentation (x86 GDT)
+* Exception handling (x86 IDT)
+* Physical memory manager
+
+## Long-term
+
 * Filesystem driver
 * Processes and beyond
 
