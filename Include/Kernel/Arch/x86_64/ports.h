@@ -1,3 +1,5 @@
+#ifdef ARCH_x86_64
+
 #pragma once
 
 /**
@@ -15,3 +17,5 @@ u8 inb(u16 port);
  * @param value The byte to output to `port`.
  */
 void outb(u16 port, u8 value);
+
+#endif

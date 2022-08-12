@@ -141,6 +141,7 @@ format: $(KERNEL_SRC) $(KERNEL_H)
 
 .PHONY: docs
 docs:
+	mkdir -p $(BUILDDIR)
 	doxygen
 
 .PHONY: docs-open

@@ -6,4 +6,4 @@
  * @param str Returns the length of this string.
  * @return The length of `str` in bytes.
  */
-u64 strlen(const char *str);
+size_t strlen(const char *str);
