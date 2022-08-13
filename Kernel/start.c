@@ -40,8 +40,11 @@ void _start() {
     printk("Hello %s number %i %x %c?\n", "World", -1234567890, 0xdeadbeef,
            '~');
     printk("INTMAX %i INTMIN %i\n", INT_MAX, INT_MIN);
-    printk("HEX %x %x\n", 0xffffffff, 0);
-    printk("OCTAL %o %o", 0x777777, 0);
+    printk("INT0 %i\n", 0);
+    printk("HEX %#x %x\n", 0xffffffff, 0);
+    debugk("OCTAL %#llo %o\n", LLONG_MAX, 0);
+    printk("%12i\n", 1234567890);
+    printk("%p\n", (void *)0x12345678deadbeef);
 
     /* TODO: Start first process */
     panic();

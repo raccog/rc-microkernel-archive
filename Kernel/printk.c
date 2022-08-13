@@ -6,6 +6,7 @@
 
 #include "printk.h"
 
+#include "Arch/x86_64/serial.h"
 #include "string.h"
 #include <limits.h>
 #include <stdarg.h>
@@ -38,14 +39,16 @@ int debugk(const char *format, ...) {
  * Everything past this point includes modified snippets from OpenBSD. Code has
  * been written from scratch, with some snippets and implementation techniques
  * originating from OpenBSD in the file `sys/kern/subr_prf.c`. OpenBSD's
- * license has been included in the file `Attribution.md`.
+ * license has been included in the file `Attributions.md`.
  */
 
-#define CHAR_BITS 8
-
-/* Buffer should be able to hold a 64-bit integer that has been formatted into
- * a string with base-8. Also should include a null terminator. */
-#define PRINTK_BUFFER_SIZE (sizeof(i64) * CHAR_BITS / 3 + 2)
+/*
+ * Buffer should be able to hold a 64-bit integer that has been formatted into
+ * a string with base-8. Also should include a null terminator.
+ *
+ * Straight from OpenBSD.
+ */
+#define PRINTK_BUFFER_SIZE (sizeof(i64) * CHAR_BIT / 3 + 2)
 
 /* types of signs that can be printed */
 enum sign_config {
@@ -73,7 +76,8 @@ enum value_type {
     TYPE_SIGNED_INTEGER,
     TYPE_UNSIGNED_INTEGER,
     TYPE_OCTAL_INTEGER,
-    TYPE_HEX_INTEGER
+    TYPE_HEX_INTEGER,
+    TYPE_POINTER
 };
 
 // TODO: Record error codes
@@ -91,22 +95,24 @@ static int vfprintk(struct kernel_chardev device, const char *format,
     const char *HEX_CHARS = "0123456789abcdef"; /* array of hex chars */
 
     /* value formatting state machine */
-    const char *specifier;    /* start to specifier in format string */
-    char c;                   /* current character being parsed */
-    char *char_buf;           /* pointer to buffer for next char */
-    size_t formatted_len;     /* length of formatted value */
-    enum sign_config sign;    /* what sign should be printed */
+    const char *specifier; /* start to specifier in format string */
+    char c;                /* current character being parsed */
+    char *char_buf;        /* pointer to buffer for next char */
+    int char_buf_size;     /* length of formatted value including zeros/sign */
+    int printed_digits;    /* length of formatted value */
+    enum sign_config sign; /* what sign should be printed */
     enum value_length length; /* length of the value in bytes */
     enum value_type vtype;    /* type of the value (int, char, string) */
     bool preceed_base;        /* preceeds integers with their base */
     bool left_justify;        /* left-justifies the formatted value */
     bool pad_zeros;           /* pad with zeros instead of spaces */
     int width;                /* value padding width */
+    bool use_precision;       /* whether precision should be used */
+    int precision;            /* how precise the value should be */
     u64 value;                /* the value to format and print */
     i64 value_signed;         /* the signed value to format and print */
     char value_char;          /* the char to print */
     const char *value_str;    /* the string to print */
-    bool found_specifier;     /* true when d,i,u,o,x,X,c,s,p is found */
 
 /* print char to device and increment counter */
 #define PRINTK_PUTC(character)                                                 \
@@ -147,7 +153,8 @@ static int vfprintk(struct kernel_chardev device, const char *format,
         left_justify = false;
         pad_zeros = false;
         width = 0;
-        found_specifier = false;
+        precision = 0;
+        use_precision = false;
 
         /* handle value formatting */
         while (*specifier != '\0') {
@@ -172,6 +179,25 @@ static int vfprintk(struct kernel_chardev device, const char *format,
             case '#':
                 preceed_base = true;
                 break;
+            /* precision */
+            case '.':
+                if (use_precision)
+                    goto formatting_failed;
+                use_precision = true;
+                c = *specifier;
+                if (c == '*') {
+                    precision = va_arg(args, int);
+                    break;
+                }
+                /* count precision */
+                while (c >= '0' && c <= '9') {
+                    int digit = PRINTK_FROM_CHAR(c);
+                    if (precision > (INT_MAX - digit) / 10)
+                        goto formatting_failed;
+                    precision = (precision * 10) + digit;
+                    c = *++specifier;
+                }
+                break;
             /* pad with zeros instead of spaces */
             case '0':
                 pad_zeros = true;
@@ -191,12 +217,13 @@ static int vfprintk(struct kernel_chardev device, const char *format,
                     goto formatting_failed;
                 }
                 /* count padding */
+                --specifier;
                 do {
                     int digit = PRINTK_FROM_CHAR(c);
                     if (width > (INT_MAX - digit) / 10)
                         goto formatting_failed;
                     width = (width * 10) + digit;
-                    c = *format++;
+                    c = *++specifier;
                 } while (c >= '0' && c <= '9');
                 break;
             /* padding from variable arguments */
@@ -261,9 +288,12 @@ static int vfprintk(struct kernel_chardev device, const char *format,
             case 'u':
                 vtype = TYPE_UNSIGNED_INTEGER;
                 goto format_value;
+            case 'p':
+                vtype = TYPE_POINTER;
+                preceed_base = true;
+                goto format_value;
             case 'x':
             case 'X':
-            case 'p':
                 vtype = TYPE_HEX_INTEGER;
                 goto format_value;
             case 'o':
@@ -273,24 +303,21 @@ static int vfprintk(struct kernel_chardev device, const char *format,
                 goto formatting_failed;
             }
         }
-        if (*format == '\0')
+        if (*specifier == '\0')
             goto formatting_failed;
 
         /* format value into buffer */
     format_value:
         char_buf = buffer + PRINTK_BUFFER_SIZE - 1;
         *char_buf-- = '\0';
-        formatted_len = 0;
         switch (vtype) {
         case TYPE_CHAR:
             // TODO: wide char?
             value_char = (char)va_arg(args, int);
-            formatted_len = 1;
             break;
         case TYPE_STRING:
             // TODO: wide chars?
             value_str = va_arg(args, const char *);
-            formatted_len = strlen(value_str);
             break;
         case TYPE_SIGNED_INTEGER:
             /* interpret argument */
@@ -325,38 +352,40 @@ static int vfprintk(struct kernel_chardev device, const char *format,
                 value_signed /= 10;
             }
             *char_buf = PRINTK_TO_CHAR(ABS(value_signed % 10));
-            if (value_signed < 0) {
-                *--char_buf = '-';
-            }
             break;
         case TYPE_HEX_INTEGER:
         case TYPE_UNSIGNED_INTEGER:
         case TYPE_OCTAL_INTEGER:
+        case TYPE_POINTER:
             /* interpret argument */
-            switch (length) {
-            case LENGTH_SHORT_SHORT:
-                value = (unsigned char)va_arg(args, unsigned);
-                break;
-            case LENGTH_SHORT:
-                value = (unsigned short)va_arg(args, unsigned);
-                break;
-            case LENGTH_LONG:
-                value = va_arg(args, unsigned long);
-                break;
-            case LENGTH_LONG_LONG:
-                value = va_arg(args, unsigned long long);
-                break;
-            case LENGTH_MAX:
-                value = va_arg(args, uintmax_t);
-                break;
-            case LENGTH_SIZE:
-                value = (u64)va_arg(args, size_t);
-                break;
-            case LENGTH_POINTER:
-                value = (u64)va_arg(args, ptrdiff_t);
-                break;
-            default:
-                value = va_arg(args, unsigned);
+            if (vtype == TYPE_POINTER) {
+                value = (u64)va_arg(args, void *);
+            } else {
+                switch (length) {
+                case LENGTH_SHORT_SHORT:
+                    value = (unsigned char)va_arg(args, unsigned);
+                    break;
+                case LENGTH_SHORT:
+                    value = (unsigned short)va_arg(args, unsigned);
+                    break;
+                case LENGTH_LONG:
+                    value = va_arg(args, unsigned long);
+                    break;
+                case LENGTH_LONG_LONG:
+                    value = va_arg(args, unsigned long long);
+                    break;
+                case LENGTH_MAX:
+                    value = va_arg(args, uintmax_t);
+                    break;
+                case LENGTH_SIZE:
+                    value = (u64)va_arg(args, size_t);
+                    break;
+                case LENGTH_POINTER:
+                    value = (u64)va_arg(args, ptrdiff_t);
+                    break;
+                default:
+                    value = va_arg(args, unsigned);
+                }
             }
             /* print unsigned integer */
             switch (vtype) {
@@ -375,6 +404,7 @@ static int vfprintk(struct kernel_chardev device, const char *format,
                 *char_buf = PRINTK_TO_CHAR(value % 10);
                 break;
             case TYPE_HEX_INTEGER:
+            case TYPE_POINTER:
                 do {
                     *char_buf-- = PRINTK_TO_HEX_CHAR(value & 0xf);
                     value >>= 4;
@@ -386,10 +416,97 @@ static int vfprintk(struct kernel_chardev device, const char *format,
             }
         }
 
+        /* calculate size of char buf */
+        switch (vtype) {
+        case TYPE_CHAR:
+            char_buf_size = 1;
+            break;
+        case TYPE_STRING:
+            char_buf_size = strlen(value_str);
+            break;
+        case TYPE_SIGNED_INTEGER:
+        case TYPE_UNSIGNED_INTEGER:
+            printed_digits = strlen(char_buf);
+            char_buf_size = printed_digits;
+            if (precision > char_buf_size)
+                char_buf_size = precision;
+            /* plus one for sign */
+            if (sign == SIGN_PLUS || sign == SIGN_SPACE ||
+                (vtype == TYPE_SIGNED_INTEGER && value_signed < 0))
+                ++char_buf_size;
+            break;
+        case TYPE_HEX_INTEGER:
+        case TYPE_OCTAL_INTEGER:
+        case TYPE_POINTER:
+            printed_digits = strlen(char_buf);
+            char_buf_size = printed_digits;
+            if (precision > char_buf_size)
+                char_buf_size = precision;
+            /* extra for preceeding base */
+            if (preceed_base) {
+                if (vtype == TYPE_HEX_INTEGER)
+                    char_buf_size += 2;
+                else
+                    ++char_buf_size;
+            }
+        }
+
+        /* add padding unless left-justified */
+        if (!pad_zeros && !left_justify && width > char_buf_size) {
+            for (int i = 0; i < width - char_buf_size; ++i) {
+                PRINTK_PUTC(' ');
+            }
+        }
+
+        /* integer-only formatting */
+        switch (vtype) {
+        case TYPE_SIGNED_INTEGER:
+        case TYPE_UNSIGNED_INTEGER:
+        case TYPE_HEX_INTEGER:
+        case TYPE_OCTAL_INTEGER:
+        case TYPE_POINTER:
+            /* print sign if a base-10 integer */
+            if (vtype == TYPE_SIGNED_INTEGER ||
+                vtype == TYPE_UNSIGNED_INTEGER) {
+                if (vtype == TYPE_SIGNED_INTEGER && value_signed < 0) {
+                    PRINTK_PUTC('-');
+                } else if (sign == SIGN_PLUS) {
+                    PRINTK_PUTC('+');
+                } else if (sign == SIGN_SPACE) {
+                    PRINTK_PUTC(' ');
+                }
+                /* preceed with radix if base-8 or base-16 */
+            } else if (preceed_base) {
+                if (vtype == TYPE_HEX_INTEGER || vtype == TYPE_POINTER) {
+                    PRINTK_PUTC('0');
+                    PRINTK_PUTC('x');
+                } else {
+                    PRINTK_PUTC('0');
+                }
+            }
+
+            /* add zeros for padding if needed */
+            if (pad_zeros && width > char_buf_size) {
+                for (int i = 0; i < width - char_buf_size; ++i) {
+                    PRINTK_PUTC('0');
+                }
+            }
+
+            /* add zeros for precision */
+            if (use_precision && precision > printed_digits) {
+                for (int i = 0; i < precision - printed_digits; ++i) {
+                    PRINTK_PUTC('0');
+                }
+            }
+            break;
+        default:
+            break;
+        }
+
         /* print formatted value */
         switch (vtype) {
         case TYPE_CHAR:
-            PRINTK_PUTC((char)va_arg(args, int));
+            PRINTK_PUTC(value_char);
             break;
         case TYPE_STRING:
             device.write(value_str);
@@ -397,8 +514,16 @@ static int vfprintk(struct kernel_chardev device, const char *format,
         case TYPE_SIGNED_INTEGER:
         case TYPE_UNSIGNED_INTEGER:
         case TYPE_HEX_INTEGER:
+        case TYPE_POINTER:
         case TYPE_OCTAL_INTEGER:
             device.write(char_buf);
+        }
+
+        /* pad if left justified */
+        if (!pad_zeros && left_justify && width > char_buf_size) {
+            for (int i = 0; i < width - char_buf_size; ++i) {
+                PRINTK_PUTC(' ');
+            }
         }
 
         /* move position in format string */
