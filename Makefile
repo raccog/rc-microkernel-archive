@@ -139,6 +139,10 @@ run-serial: format $(INSTALL_DISK) save-log
 format: $(KERNEL_SRC) $(KERNEL_H)
 	clang-format -i -style=file $^
 
+.PHONY: tidy
+tidy: $(KERNEL_SRC) $(KERNEL_H)
+	clang-tidy $^ -- $(DEFAULT_H) $(CFLAGS) $(KERNEL_CFLAGS) $(ARCH_CFLAGS)
+
 .PHONY: docs
 docs:
 	mkdir -p $(BUILDDIR)
