@@ -6,7 +6,6 @@
 
 #include "printk.h"
 
-#include "Arch/x86_64/serial.h"
 #include "string.h"
 #include <limits.h>
 #include <stdarg.h>
@@ -14,6 +13,7 @@
 // TODO: Move to standard library
 #define ABS(x) (x < 0 ? -x : x)
 
+/* most of printk is implemented here */
 static int vfprintk(struct kernel_chardev device, const char *format,
                     va_list args);
 
@@ -50,26 +50,35 @@ int debugk(const char *format, ...) {
  */
 #define PRINTK_BUFFER_SIZE (sizeof(i64) * CHAR_BIT / 3 + 2)
 
-/* types of signs that can be printed */
+/* convert single base-10 digit integer to its character */
+#define PRINTK_TO_CHAR(digit) ('0' + (char)(digit))
+
+/* convert single base-10 digit integer from its character */
+#define PRINTK_FROM_CHAR(character) (int)((character) - '0')
+
+/* convert single base-16 digit integer to its hex character */
+#define PRINTK_TO_HEX_CHAR(digit) (*(HEX_CHARS + (digit)))
+
+/* which sign should be printed */
 enum sign_config {
     SIGN_PLUS,   /* print a plus for positives */
     SIGN_SPACE,  /* print a space in place of a sign for positives */
     SIGN_DEFAULT /* print no sign for positives */
 };
 
-/* the length in bytes of a value */
+/* an integer value's length in bytes */
 enum value_length {
-    LENGTH_NONE,
-    LENGTH_SHORT_SHORT,
-    LENGTH_SHORT,
-    LENGTH_LONG,
-    LENGTH_LONG_LONG,
-    LENGTH_MAX,
-    LENGTH_SIZE,
-    LENGTH_POINTER,
+    LENGTH_NONE,    /* int/unsigned int */
+    LENGTH_SSHORT,  /* signed char/unsigned char */
+    LENGTH_SHORT,   /* short int/short unsigned int */
+    LENGTH_LONG,    /* long int/long unsigned int */
+    LENGTH_LLONG,   /* long long int/long long unsigned int */
+    LENGTH_MAX,     /* intmax_t/uintmax_t */
+    LENGTH_SIZE,    /* size_t */
+    LENGTH_POINTER, /* ptrdiff_t */
 };
 
-/* the type of the value */
+/* the type of value being formatted */
 enum value_type {
     TYPE_CHAR,
     TYPE_STRING,
@@ -80,14 +89,6 @@ enum value_type {
     TYPE_POINTER
 };
 
-// TODO: Record error codes
-#define PRINTK_PLUS_OVERWRITTEN (-1)
-#define PRINTK_PADDING_OVERFLOW (-2)
-#define PRINTK_MULTIPLE_PADDINGS (-3)
-#define PRINTK_INVALID_VALUE_LENGTH (-4)
-#define PRINTK_INVALID_FORMATTING (-5)
-#define PRINTK_PREMATURE_TERMINATOR (-6)
-
 static int vfprintk(struct kernel_chardev device, const char *format,
                     va_list args) {
     int count = 0;                   /* # of characters printed */
@@ -95,41 +96,47 @@ static int vfprintk(struct kernel_chardev device, const char *format,
     const char *HEX_CHARS = "0123456789abcdef"; /* array of hex chars */
 
     /* value formatting state machine */
-    const char *specifier; /* start to specifier in format string */
-    char c;                /* current character being parsed */
-    char *char_buf;        /* pointer to buffer for next char */
-    int char_buf_size;     /* length of formatted value including zeros/sign */
-    int printed_digits;    /* length of formatted value */
-    enum sign_config sign; /* what sign should be printed */
-    enum value_length length; /* length of the value in bytes */
-    enum value_type vtype;    /* type of the value (int, char, string) */
-    bool preceed_base;        /* preceeds integers with their base */
+    char c;                   /* current character being parsed */
+    const char *specifier;    /* start of specifier in format string */
+    char *char_buf;           /* pointer to buffer */
+    int char_buf_size;        /* length of buffer after value is formatted */
+    int printed_digits;       /* number of digits in an integer value */
+    enum sign_config sign;    /* sign to be printed */
+    enum value_length length; /* length of integer value in bytes */
+    enum value_type vtype;    /* type of value (int, char, string, pointer) */
+    bool preceed_base;        /* should preceed integers with their radix */
     bool left_justify;        /* left-justifies the formatted value */
     bool pad_zeros;           /* pad with zeros instead of spaces */
-    int width;                /* value padding width */
-    bool use_precision;       /* whether precision should be used */
-    int precision;            /* how precise the value should be */
-    u64 value;                /* the value to format and print */
-    i64 value_signed;         /* the signed value to format and print */
-    char value_char;          /* the char to print */
-    const char *value_str;    /* the string to print */
+    bool use_precision;       /* should precision be used */
+    int width;                /* min width of value in characters */
+    int precision;            /* min number of digits for integer value */
+    u64 value;                /* unsigned value */
+    i64 value_signed;         /* signed value */
+    char value_char;          /* character value */
+    const char *value_str;    /* string value */
+    int __status;             /* status used for internal macro */
 
-/* print char to device and increment counter */
+/* print char to device and increment counter. return if `write_char()` returns
+ * an error. */
 #define PRINTK_PUTC(character)                                                 \
-    device.write_char(character);                                              \
+    __status = device.write_char(character);                                   \
+    if (__status < 0)                                                          \
+        return __status;                                                       \
     ++count
 
-#define PRINTK_TO_CHAR(digit) ('0' + (char)(digit))
-
-#define PRINTK_TO_HEX_CHAR(digit) (*(HEX_CHARS + (digit)))
-
-#define PRINTK_FROM_CHAR(character) (int)((character) - '0')
+/* print string to device and increment counter. return if `write()`
+ * returns an error. */
+#define PRINTK_PUTS(string)                                                    \
+    __status = device.write(string);                                           \
+    if (__status < 0)                                                          \
+        return __status;                                                       \
+    count += strlen(string)
 
     /* loop through format string */
     while (*format != '\0') {
         /* print all characters until a '%' is found */
         while (*format != '%' && *format != '\0') {
-            /* control is brought back here if formatting a value fails */
+            /* process control is brought back here if parsing fails */
         formatting_failed:
             PRINTK_PUTC(*format++);
         }
@@ -175,21 +182,23 @@ static int vfprintk(struct kernel_chardev device, const char *format,
                 if (sign != SIGN_PLUS)
                     sign = SIGN_SPACE;
                 break;
-            /* preceed with base (0x, 0o) */
+            /* preceed with base (0x or 0) */
             case '#':
                 preceed_base = true;
                 break;
             /* precision */
             case '.':
+                /* cannot have multiple precicsion values */
                 if (use_precision)
                     goto formatting_failed;
                 use_precision = true;
                 c = *specifier;
+                /* get precision from argument */
                 if (c == '*') {
                     precision = va_arg(args, int);
                     break;
                 }
-                /* count precision */
+                /* parse precision */
                 while (c >= '0' && c <= '9') {
                     int digit = PRINTK_FROM_CHAR(c);
                     if (precision > (INT_MAX - digit) / 10)
@@ -212,10 +221,9 @@ static int vfprintk(struct kernel_chardev device, const char *format,
             case '7':
             case '8':
             case '9':
-                /* do not format if padding was already specified */
-                if (width != 0) {
+                /* do not parse if padding was already specified */
+                if (width != 0)
                     goto formatting_failed;
-                }
                 /* count padding */
                 --specifier;
                 do {
@@ -228,7 +236,7 @@ static int vfprintk(struct kernel_chardev device, const char *format,
                 break;
             /* padding from variable arguments */
             case '*':
-                /* do not format if padding was already specified */
+                /* do not parse if padding was already specified */
                 if (width != 0)
                     goto formatting_failed;
                 width = va_arg(args, int);
@@ -236,7 +244,7 @@ static int vfprintk(struct kernel_chardev device, const char *format,
             /* short length value (or short-short) */
             case 'h':
                 if (length == LENGTH_SHORT)
-                    length = LENGTH_SHORT_SHORT;
+                    length = LENGTH_SSHORT;
                 else if (length != LENGTH_NONE)
                     goto formatting_failed;
                 else
@@ -245,7 +253,7 @@ static int vfprintk(struct kernel_chardev device, const char *format,
             /* long length value (or long-long) */
             case 'l':
                 if (length == LENGTH_LONG)
-                    length = LENGTH_LONG_LONG;
+                    length = LENGTH_LLONG;
                 else if (length != LENGTH_NONE)
                     goto formatting_failed;
                 else
@@ -308,6 +316,7 @@ static int vfprintk(struct kernel_chardev device, const char *format,
 
         /* format value into buffer */
     format_value:
+        /* pointer to end of buffer */
         char_buf = buffer + PRINTK_BUFFER_SIZE - 1;
         *char_buf-- = '\0';
         switch (vtype) {
@@ -322,17 +331,17 @@ static int vfprintk(struct kernel_chardev device, const char *format,
         case TYPE_SIGNED_INTEGER:
             /* interpret argument */
             switch (length) {
-            case LENGTH_SHORT_SHORT:
+            case LENGTH_SSHORT:
                 value_signed = (signed char)va_arg(args, int);
                 break;
             case LENGTH_SHORT:
-                value_signed = (short)va_arg(args, int);
+                value_signed = (short int)va_arg(args, int);
                 break;
             case LENGTH_LONG:
-                value_signed = va_arg(args, long);
+                value_signed = va_arg(args, long int);
                 break;
-            case LENGTH_LONG_LONG:
-                value_signed = va_arg(args, long long);
+            case LENGTH_LLONG:
+                value_signed = va_arg(args, long long int);
                 break;
             case LENGTH_MAX:
                 value_signed = va_arg(args, intmax_t);
@@ -362,17 +371,17 @@ static int vfprintk(struct kernel_chardev device, const char *format,
                 value = (u64)va_arg(args, void *);
             } else {
                 switch (length) {
-                case LENGTH_SHORT_SHORT:
-                    value = (unsigned char)va_arg(args, unsigned);
+                case LENGTH_SSHORT:
+                    value = (unsigned char)va_arg(args, unsigned int);
                     break;
                 case LENGTH_SHORT:
-                    value = (unsigned short)va_arg(args, unsigned);
+                    value = (unsigned short int)va_arg(args, unsigned int);
                     break;
                 case LENGTH_LONG:
-                    value = va_arg(args, unsigned long);
+                    value = va_arg(args, unsigned long int);
                     break;
-                case LENGTH_LONG_LONG:
-                    value = va_arg(args, unsigned long long);
+                case LENGTH_LLONG:
+                    value = va_arg(args, unsigned long long int);
                     break;
                 case LENGTH_MAX:
                     value = va_arg(args, uintmax_t);
@@ -390,6 +399,7 @@ static int vfprintk(struct kernel_chardev device, const char *format,
             /* print unsigned integer */
             switch (vtype) {
             case TYPE_OCTAL_INTEGER:
+                /* print octal */
                 do {
                     *char_buf-- = PRINTK_TO_CHAR(value & 7);
                     value >>= 3;
@@ -397,6 +407,7 @@ static int vfprintk(struct kernel_chardev device, const char *format,
                 ++char_buf;
                 break;
             case TYPE_UNSIGNED_INTEGER:
+                /* print base-10 */
                 while (value >= 10) {
                     *char_buf-- = PRINTK_TO_CHAR(value % 10);
                     value /= 10;
@@ -405,6 +416,7 @@ static int vfprintk(struct kernel_chardev device, const char *format,
                 break;
             case TYPE_HEX_INTEGER:
             case TYPE_POINTER:
+                /* print hex */
                 do {
                     *char_buf-- = PRINTK_TO_HEX_CHAR(value & 0xf);
                     value >>= 4;
@@ -424,13 +436,18 @@ static int vfprintk(struct kernel_chardev device, const char *format,
         case TYPE_STRING:
             char_buf_size = strlen(value_str);
             break;
-        case TYPE_SIGNED_INTEGER:
-        case TYPE_UNSIGNED_INTEGER:
+        default:
             printed_digits = strlen(char_buf);
             char_buf_size = printed_digits;
             if (precision > char_buf_size)
                 char_buf_size = precision;
-            /* plus one for sign */
+        }
+
+        /* count extra characters */
+        switch (vtype) {
+        case TYPE_SIGNED_INTEGER:
+        case TYPE_UNSIGNED_INTEGER:
+            /* preceeding sign */
             if (sign == SIGN_PLUS || sign == SIGN_SPACE ||
                 (vtype == TYPE_SIGNED_INTEGER && value_signed < 0))
                 ++char_buf_size;
@@ -438,17 +455,15 @@ static int vfprintk(struct kernel_chardev device, const char *format,
         case TYPE_HEX_INTEGER:
         case TYPE_OCTAL_INTEGER:
         case TYPE_POINTER:
-            printed_digits = strlen(char_buf);
-            char_buf_size = printed_digits;
-            if (precision > char_buf_size)
-                char_buf_size = precision;
-            /* extra for preceeding base */
+            /* preceeding radix */
             if (preceed_base) {
                 if (vtype == TYPE_HEX_INTEGER)
                     char_buf_size += 2;
                 else
                     ++char_buf_size;
             }
+        default:
+            break;
         }
 
         /* add padding unless left-justified */
@@ -466,9 +481,8 @@ static int vfprintk(struct kernel_chardev device, const char *format,
         case TYPE_OCTAL_INTEGER:
         case TYPE_POINTER:
             /* print sign if a base-10 integer */
-            if (vtype == TYPE_SIGNED_INTEGER ||
-                vtype == TYPE_UNSIGNED_INTEGER) {
-                if (vtype == TYPE_SIGNED_INTEGER && value_signed < 0) {
+            if (vtype == TYPE_SIGNED_INTEGER) {
+                if (value_signed < 0) {
                     PRINTK_PUTC('-');
                 } else if (sign == SIGN_PLUS) {
                     PRINTK_PUTC('+');
@@ -480,7 +494,7 @@ static int vfprintk(struct kernel_chardev device, const char *format,
                 if (vtype == TYPE_HEX_INTEGER || vtype == TYPE_POINTER) {
                     PRINTK_PUTC('0');
                     PRINTK_PUTC('x');
-                } else {
+                } else if (vtype == TYPE_OCTAL_INTEGER) {
                     PRINTK_PUTC('0');
                 }
             }
@@ -509,14 +523,14 @@ static int vfprintk(struct kernel_chardev device, const char *format,
             PRINTK_PUTC(value_char);
             break;
         case TYPE_STRING:
-            device.write(value_str);
+            PRINTK_PUTS(value_str);
             break;
         case TYPE_SIGNED_INTEGER:
         case TYPE_UNSIGNED_INTEGER:
         case TYPE_HEX_INTEGER:
         case TYPE_POINTER:
         case TYPE_OCTAL_INTEGER:
-            device.write(char_buf);
+            PRINTK_PUTS(char_buf);
         }
 
         /* pad if left justified */
