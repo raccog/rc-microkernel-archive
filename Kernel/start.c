@@ -35,6 +35,8 @@ void _start() {
 
     arch_init();
 
+    printk("Hello %s number %i?\n", "World", 1);
+
     /* TODO: Start first process */
     panic();
 }

@@ -6,6 +6,7 @@
 #include "RC/string.h"
 #include "character_device.h"
 #include "panic.h"
+#include <limits.h>
 
 // TODO: Move to limine elf section
 static volatile struct limine_terminal_request TERMINAL_REQUEST = {
@@ -28,18 +29,21 @@ int terminal_init() {
 }
 
 int terminal_write(const char *str) {
-    u64 len = strlen(str);
+    size_t len = strlen(str);
     if (!TERMINAL0)
         return -1;
     TERMINAL_REQUEST.response->write(TERMINAL0, str, len);
-    return 0;
+    /* printed character count overflow */
+    if (len > INT_MAX)
+        return -2;
+    return (int)len;
 }
 
 int terminal_write_char(char c) {
     if (!TERMINAL0)
         return -1;
     TERMINAL_REQUEST.response->write(TERMINAL0, &c, 1);
-    return 0;
+    return 1;
 }
 
 #endif

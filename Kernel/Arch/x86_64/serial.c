@@ -36,9 +36,10 @@ int serial_init() {
 }
 
 int serial_write(const char *str) {
+    int count = 0;
     while (*str != '\0') {
-        serial_write_char(*str);
-        ++str;
+        serial_write_char(*str++);
+        ++count;
     }
     return 0;
 }
@@ -49,7 +50,7 @@ int serial_write_char(char c) {
 
     outb(COM1_PORT, c);
 
-    return 0;
+    return 1;
 }
 
 bool serial_is_transmit_empty() { return inb(COM1_PORT + 5) & 0x20; }
