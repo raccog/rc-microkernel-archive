@@ -3,6 +3,8 @@
 #include "panic.h"
 #include "printk.h"
 
+#include "Tests/kernel_tests.h"
+
 #define KERNEL_VERSION "v0.0.1"
 #define BOOT_MESSAGE                                                           \
     "rc-microkernel version (" KERNEL_VERSION ") compiled on " __DATE__        \
@@ -34,6 +36,10 @@ void _start() {
     print_boot_message();
 
     arch_init();
+
+#ifdef RUN_TESTS
+    run_kernel_tests();
+#endif
 
     /* TODO: Start first process */
     panic();

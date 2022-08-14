@@ -1,6 +1,11 @@
 # This makefile is inspired by the template at https://github.com/limine-bootloader/limine-barebones
 
-BUILDDIR ?= Build
+BUILDDIR_BASE ?= Build
+ifeq ($(MAKECMDGOALS),test)
+BUILDDIR ?= $(BUILDDIR_BASE)/test
+else
+BUILDDIR ?= $(BUILDDIR_BASE)/prod
+endif
 CACHEDIR ?= .cache
 
 #
@@ -42,6 +47,10 @@ CFLAGS ?= -O2 -g -Wall -Wextra -Wpedantic -IInclude -std=c17 \
 CPPFLAGS ?=
 NASMFLAGS ?= -F dwarf -g -f elf64
 LDFLAGS ?=
+
+ifeq ($(MAKECMDGOALS),test)
+include Kernel/Tests/Makefile
+endif
 
 # Internal C flags that should not be changed by the user
 override KERNEL_CFLAGS := 	\
@@ -92,21 +101,7 @@ $(BUILDDIR)/%.o: %.asm
 
 $(INSTALL_DISK): $(KERNEL_IMAGE) $(LIMINEDIR)
 	@mkdir -p $(@D)
-	dd if=/dev/zero bs=1M count=0 seek=64 of=$@
-	parted -s $@ mklabel gpt
-	parted -s $@ mkpart ESP fat32 2048s 100%
-	parted -s $@ set 1 esp on
-	$(LIMINEDIR)/limine-deploy $@
-	USED_LOOPBACK=$$(sudo losetup -Pf --show $@) ;\
-	sudo mkfs.fat -F 32 $${USED_LOOPBACK}p1 ;\
-	mkdir -p $(MOUNTDIR) ;\
-	sudo mount $${USED_LOOPBACK}p1 $(MOUNTDIR) ;\
-	sudo mkdir -p $(MOUNTDIR)/EFI/BOOT ;\
-	sudo cp -v $(KERNEL_IMAGE) limine.cfg $(LIMINEDIR)/limine.sys $(MOUNTDIR) ;\
-	sudo cp -v $(LIMINEDIR)/BOOTX64.EFI $(MOUNTDIR)/EFI/BOOT ;\
-	sync ;\
-	sudo umount $(MOUNTDIR) ;\
-	sudo losetup -d $$USED_LOOPBACK
+	./install_loopback.sh $@ $<
 
 $(LIMINEDIR):
 	@mkdir -p $(@D)
@@ -119,8 +114,8 @@ save-log:
 	if [[ -f $(LOG_FILE) ]]; then mv $(LOG_FILE) $(BUILDDIR)/kernel.old.log; fi
 
 # Output serial to console as well as log
-.PHONY: run
-run: format $(INSTALL_DISK) save-log
+.PHONY: run test
+run test: format $(INSTALL_DISK) save-log
 	qemu-system-x86_64 \
 		-m 256M \
 		-hda $(INSTALL_DISK) \
@@ -154,7 +149,7 @@ docs-open: docs
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILDDIR)
+	rm -rf $(BUILDDIR_BASE)
 
 .PHONY: nuke
 nuke: clean
