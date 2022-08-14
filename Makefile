@@ -71,8 +71,8 @@ override KERNEL_LDFLAGS := 		\
 	-Wl,-T,Kernel/linker.ld
 
 # File globs
-override KERNEL_OBJ := $(patsubst %.c,$(BUILDDIR)/%.o,$(KERNEL_SRC))
-override KERNEL_OBJ_ASM := $(patsubst %.asm,$(BUILDDIR)/%.o,$(KERNEL_SRC_ASM))
+override KERNEL_OBJ := $(patsubst %.c,$(BUILDDIR)/%.c.o,$(KERNEL_SRC))
+override KERNEL_OBJ_ASM := $(patsubst %.asm,$(BUILDDIR)/%.asm.o,$(KERNEL_SRC_ASM))
 
 override KERNEL_DEPS := $(KERNEL_SRC:.c=.d) $(KERNEL_SRC_ASM:.asm=.d)
 override DEFAULT_H := RC/stdint.h stdbool.h
@@ -91,11 +91,11 @@ $(KERNEL_IMAGE): $(KERNEL_OBJ) $(KERNEL_OBJ_ASM)
 
 -include $(KERNEL_DEPS)
 
-$(BUILDDIR)/%.o: %.c
+$(BUILDDIR)/%.c.o: %.c
 	@mkdir -p $(@D)
 	$(CC) $(DEFAULT_H) $(CFLAGS) $(KERNEL_CFLAGS) $(ARCH_CFLAGS) -c $< -o $@
 
-$(BUILDDIR)/%.o: %.asm
+$(BUILDDIR)/%.asm.o: %.asm
 	@mkdir -p $(@D)
 	nasm $(NASMFLAGS) $(KERNEL_NASMFLAGS) -o $@ $<
 

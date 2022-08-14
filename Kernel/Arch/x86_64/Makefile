@@ -12,6 +12,7 @@ override ARCH_CFLAGS :=      \
 	-march=x86-64
 
 KERNEL_SRC += 						\
+	Kernel/Arch/x86_64/gdt.c		\
 	Kernel/Arch/x86_64/init.c		\
 	Kernel/Arch/x86_64/serial.c
 

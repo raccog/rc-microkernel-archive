@@ -1,16 +1,16 @@
-        global x86_64_get_gdt
+        global get_gdt
 
         section .data
-        align 8
 gdtr:
+        align 4
         gdtr_limit  dw 0    ; limit
+        align 8
         gdtr_base   dq 0    ; base
 
         section .text
-x86_64_get_gdt:
+get_gdt:
         sgdt [gdtr]
-        mov ax, [gdtr_limit]
-        mov rdx, [gdtr_base]
+        mov rax, gdtr
         ret
 
 
