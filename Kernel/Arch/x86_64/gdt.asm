@@ -1,4 +1,6 @@
         global get_gdt
+        global load_gdt
+        global gdt
 
         section .data
 gdtr:
@@ -13,4 +15,7 @@ get_gdt:
         mov rax, gdtr
         ret
 
+load_gdt:
+        lgdt [rdi]
+        ret
 

@@ -43,4 +43,9 @@ void init_gdt();
  */
 extern struct region_descriptor *get_gdt();
 
+/**
+ * Loads a region descriptor (GDTR) as the current GDT.
+ */
+extern void load_gdt(struct region_descriptor *gdtr);
+
 #endif
