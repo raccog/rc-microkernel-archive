@@ -33,12 +33,20 @@ struct mem_segment_descriptor {
 void init_gdt();
 
 /**
- * Returns the currently loaded GDT's region descriptor.
+ * Sets `gdtr` to the current GDT register.
+ *
+ * Note: The memory pointed to by `gdtr` must be at least 10 bytes in length.
+ * It must also be aligned to an odd-word address (divisible by 2 but not 4)
+ * so that both fields in GDTR are properly aligned.
+ *
+ * @param gdtr A location in memory to store the current GDTR.
  */
 extern void x86_sgdt(struct region_descriptor *gdtr);
 
 /**
  * Loads a region descriptor (GDTR) as the current GDT.
+ *
+ * @param gdtr The GDTR to load.
  */
 extern void x86_lgdt(const struct region_descriptor *gdtr);
 

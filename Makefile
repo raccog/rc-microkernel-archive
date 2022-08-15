@@ -91,7 +91,7 @@ $(KERNEL_IMAGE): $(KERNEL_OBJ) $(KERNEL_OBJ_ASM)
 
 -include $(KERNEL_DEPS)
 
-$(BUILDDIR)/%.c.o: %.c
+$(BUILDDIR)/%.c.o: %.c $(KERNEL_H)
 	@mkdir -p $(@D)
 	$(CC) $(DEFAULT_H) $(CFLAGS) $(KERNEL_CFLAGS) $(ARCH_CFLAGS) -c $< -o $@
 
