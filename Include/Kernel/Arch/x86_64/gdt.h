@@ -36,8 +36,6 @@ void init_gdt();
  * Sets `gdtr` to the current GDT register.
  *
  * Note: The memory pointed to by `gdtr` must be at least 10 bytes in length.
- * It must also be aligned to an odd-word address (divisible by 2 but not 4)
- * so that both fields in GDTR are properly aligned.
  *
  * @param gdtr A location in memory to store the current GDTR.
  */

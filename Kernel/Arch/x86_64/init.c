@@ -3,6 +3,7 @@
 #include "Arch/common.h"
 
 #include "Arch/x86_64/gdt.h"
+#include "Arch/x86_64/idt.h"
 #include "Arch/x86_64/serial.h"
 #include "character_device.h"
 #include "terminal.h"
@@ -16,7 +17,7 @@ void arch_early_init() {
 
 void arch_init() {
     init_gdt();
-    return;
+    init_idt();
 }
 
 #endif

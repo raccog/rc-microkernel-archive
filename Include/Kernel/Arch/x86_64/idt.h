@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "segment.h"
+
 /**
  * A descriptor for an interrupt gate in the IDT.
  */
@@ -24,6 +26,27 @@ struct gate_descriptor {
 /**
  * Initialize the IDT.
  */
-// void init_idt();
+void init_idt();
+
+/**
+ * Generic interrupt service routine.
+ */
+extern void isr();
+
+/**
+ * Sets `idtr` to the current IDT register.
+ *
+ * Note: The memory pointed to by `idtr` must be at least 10 bytes in length.
+ *
+ * @param idtr A location in memory to store the current IDTR.
+ */
+extern void x86_sidt(struct region_descriptor *idtr);
+
+/**
+ * Loads a region descriptor (IDTR) as the current IDT.
+ *
+ * @param idtr The IDTR to load.
+ */
+extern void x86_lidt(const struct region_descriptor *idtr);
 
 #endif
