@@ -1,21 +1,12 @@
-        global get_gdt
-        global load_gdt
-        global gdt
-
-        section .data
-gdtr:
-        align 4
-        gdtr_limit  dw 0    ; limit
-        align 8
-        gdtr_base   dq 0    ; base
+        global x86_sgdt
+        global x86_lgdt
 
         section .text
-get_gdt:
-        sgdt [gdtr]
-        mov rax, gdtr
+x86_sgdt:
+        sgdt [rdi]
         ret
 
-load_gdt:
+x86_lgdt:
         lgdt [rdi]
         ret
 

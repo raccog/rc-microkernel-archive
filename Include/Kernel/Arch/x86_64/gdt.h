@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "segment.h"
+
 /**
  * A descriptor for a memory segment in the GDT.
  */
@@ -26,14 +28,6 @@ struct mem_segment_descriptor {
 } __attribute__((packed));
 
 /**
- * The descriptor used to load and store GDT/IDT.
- */
-struct region_descriptor {
-    u16 limit; /* segment limit */
-    u64 base;  /* segment base address */
-} __attribute__((packed));
-
-/**
  * Initialize the GDT.
  */
 void init_gdt();
@@ -41,11 +35,11 @@ void init_gdt();
 /**
  * Returns the currently loaded GDT's region descriptor.
  */
-extern struct region_descriptor *get_gdt();
+extern void x86_sgdt(struct region_descriptor *gdtr);
 
 /**
  * Loads a region descriptor (GDTR) as the current GDT.
  */
-extern void load_gdt(struct region_descriptor *gdtr);
+extern void x86_lgdt(const struct region_descriptor *gdtr);
 
 #endif

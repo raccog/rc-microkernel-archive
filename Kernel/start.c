@@ -39,6 +39,8 @@ void _start() {
 
 #ifdef RUN_TESTS
     run_kernel_tests();
+#else
+    debugk("Finished\n");
 #endif
 
     /* TODO: Start first process */

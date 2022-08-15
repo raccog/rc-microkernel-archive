@@ -6,12 +6,10 @@
 
 #include "printk.h"
 
-#include "string.h"
+#include "RC/stdlib.h"
+#include "RC/string.h"
 #include <limits.h>
 #include <stdarg.h>
-
-// TODO: Move to standard library
-#define ABS(x) (x < 0 ? -x : x)
 
 /* most of printk is implemented here */
 static int vfprintk(struct kernel_chardev device, const char *format,
